@@ -3,6 +3,13 @@
 ## 🎯 Featured Projects
 
 <p align="center">
+  <a href="https://your-project-link.com" target="_blank">
+    <img src="utils/project_link.png" alt="Open Project" width="780"/>
+  </a>
+  <br/>
+  <sub>🔗 Click image to explore project</sub>
+</p>
+<p align="center">
   <a href="https://drive.google.com/drive/folders/1R1nRiGa7XAcqbGWoCM4DwgXcmH-x5qw7?usp=drive_link" target="_blank">
     <img src="https://img.shields.io/badge/📁-View_All_Videos-red?style=for-the-badge&logo=google-drive" alt="View All Videos"/>
   </a>
