@@ -3,7 +3,7 @@
 ## 🎯 Featured Projects
 
 <p align="center">
-  <a href="[https://your-project-link.com](https://drive.google.com/drive/folders/1R1nRiGa7XAcqbGWoCM4DwgXcmH-x5qw7?usp=drive_link)" target="_blank">
+    <a href="https://drive.google.com/drive/folders/1R1nRiGa7XAcqbGWoCM4DwgXcmH-x5qw7?usp=drive_link" target="_blank">
     <img src="utils/project_link.png" alt="Open Project" width="880"/>
   </a>
   <br/>
