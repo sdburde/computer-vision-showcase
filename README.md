@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://your-project-link.com" target="_blank">
-    <img src="utils/project_link.png" alt="Open Project" width="780"/>
+    <img src="utils/project_link.png" alt="Open Project" width="880"/>
   </a>
   <br/>
   <sub>🔗 Click image to explore project</sub>
