@@ -288,26 +288,11 @@ Hygiene monitoring system for food processing facilities.
 
 ---
 
-## 📄 Publications & Certifications
-
 - **NVIDIA DeepStream SDK** - Edge AI Deployment
 - **TensorRT Optimization** - INT8/FP16 Quantization
 - **Ultralytics YOLO** - Custom Model Training
 - **GCP Professional** - Cloud Deployment & MLOps
 
----
-
-## 🤝 Let's Connect
-
-I'm passionate about deploying **real-time computer vision** systems that solve real-world safety and monitoring challenges. Whether it's edge optimization, multi-camera pipelines, or integrating GenAI with CV, I love tackling complex problems.
-
-**Open to:** AI Engineer | Computer Vision Engineer | ML Engineer | Edge AI Specialist roles
-
-📧 **Email:** saurabh.burde@email.com  
-💼 **LinkedIn:** [linkedin.com/in/saurabhburde](https://linkedin.com/in/saurabhburde/)  
-🐙 **GitHub:** [github.com/sdburde](https://github.com/sdburde/)
-
----
 
 <p align="center">
   <em>Click on any GIF above to view the full demo video on Google Drive</em>
