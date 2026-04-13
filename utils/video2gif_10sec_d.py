@@ -10,7 +10,7 @@ VIDEO_DIR = Path("videos")
 GIF_DIR = Path("gifs")
 
 START_TIME = 0   # skip first 5 seconds
-DURATION = 20
+DURATION = 12
 FPS = 15
 WIDTH = 800
 
