@@ -1,0 +1,8 @@
+com.rtspcamera.app-pngs-0 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/build/generated/res/pngs/debug
+com.rtspcamera.app-updated_navigation_xml-1 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/build/generated/updated_navigation_xml/debug
+com.rtspcamera.app-packageDebugResources-2 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.rtspcamera.app-packageDebugResources-3 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.rtspcamera.app-debug-4 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.rtspcamera.app-debug-5 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/src/debug/res
+com.rtspcamera.app-main-6 /home/saurabh/Downloads/RTSPCamera-source/RTSPCamera/app/src/main/res
+gradleHome-0 /home/saurabh/.gradle

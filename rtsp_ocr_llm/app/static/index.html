@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RTSP Live Stream</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #58a6ff;
+      letter-spacing: 0.5px;
+    }
+
+    #status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid transparent;
+      transition: all 0.3s;
+    }
+    #status-badge.connecting { border-color: #f0883e; color: #f0883e; background: #f0883e1a; }
+    #status-badge.live       { border-color: #3fb950; color: #3fb950; background: #3fb9501a; }
+    #status-badge.offline    { border-color: #f85149; color: #f85149; background: #f851491a; }
+
+    #dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    #status-badge.live #dot { animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    .stream-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 1200px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #video-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    #ocr-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    #placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: #484f58;
+    }
+
+    #placeholder svg { width: 64px; height: 64px; }
+    #placeholder p { font-size: 1rem; }
+
+    .overlay {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+    }
+
+    .pill {
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      color: #e6edf3;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .info-bar {
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .info-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+    .info-card .label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+    .info-card .value { font-size: 1.1rem; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      padding: 8px 20px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #e6edf3;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    button:hover { background: #30363d; border-color: #58a6ff; }
+    button:active { background: #388bfd26; }
+
+    #btn-fs { display: flex; align-items: center; gap: 6px; }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #8b949e;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-label input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer; accent-color: #58a6ff;
+    }
+
+    /* OCR results panel */
+    .ocr-panel {
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 16px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .ocr-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid #30363d;
+      font-size: 0.8rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .ocr-panel-header span { color: #3fb950; font-variant-numeric: tabular-nums; }
+
+    #ocr-results-list {
+      padding: 12px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 48px;
+    }
+
+    .ocr-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+    }
+
+    .ocr-text { color: #e6edf3; }
+    .ocr-conf { color: #3fb950; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+    .ocr-empty { color: #484f58; font-size: 0.85rem; align-self: center; }
+
+    /* ── Q&A panel ─── */
+    .qa-panel {
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 16px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .qa-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid #30363d;
+      font-size: 0.8rem; color: #8b949e;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .qa-panel-header a {
+      color: #58a6ff; font-size: 0.75rem; text-decoration: none;
+      padding: 3px 10px; border: 1px solid #30363d; border-radius: 5px;
+      text-transform: none; letter-spacing: 0;
+      transition: border-color 0.2s;
+    }
+    .qa-panel-header a:hover { border-color: #58a6ff; }
+    .qa-status-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; margin-right: 6px;
+      background: #484f58;
+    }
+    .qa-status-dot.ready { background: #3fb950; animation: pulse 2s infinite; }
+    .qa-status-dot.loading { background: #f0883e; animation: pulse 0.8s infinite; }
+
+    #qa-body {
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .qa-item {
+      border-bottom: 1px solid #21262d;
+    }
+    .qa-item:last-child { border-bottom: none; }
+    .qa-q {
+      padding: 12px 16px 8px;
+      font-size: 0.88rem; font-weight: 600;
+      color: #58a6ff;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .qa-q-badge {
+      flex-shrink: 0; width: 20px; height: 20px;
+      border-radius: 50%; background: #58a6ff22;
+      border: 1px solid #58a6ff44;
+      font-size: 0.65rem; font-weight: 700; color: #58a6ff;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 1px;
+    }
+    .qa-a {
+      padding: 0 16px 12px 44px;
+      font-size: 0.85rem; color: #c9d1d9; line-height: 1.6;
+    }
+    .qa-no-result {
+      padding: 20px 16px; color: #484f58; font-size: 0.85rem; text-align: center;
+    }
+    .lm-arranged {
+      padding: 12px 16px;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.82rem; color: #8b949e;
+      line-height: 1.6;
+    }
+    .lm-arranged strong { color: #8b949e; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
+    .lm-arranged span   { color: #c9d1d9; }
+    .lm-error-inline {
+      padding: 10px 16px;
+      font-size: 0.8rem; color: #f85149;
+      border-bottom: 1px solid #21262d;
+    }
+
+    /* ── Markdown render ── */
+    .md-body {
+      padding: 14px 18px;
+      font-size: 0.88rem; line-height: 1.75; color: #c9d1d9;
+    }
+    .md-body h1,.md-body h2,.md-body h3 { color: #e6edf3; margin: 10px 0 4px; font-size: 1rem; }
+    .md-body strong { color: #f0f6fc; font-weight: 700; }
+    .md-body em     { color: #d2a8ff; }
+    .md-body ul,.md-body ol { padding-left: 18px; margin: 4px 0; }
+    .md-body li     { margin: 2px 0; }
+    .md-body code   { background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 1px 5px; font-family: 'Cascadia Code','Consolas',monospace; font-size: 0.8rem; color: #79c0ff; }
+    .md-body pre    { background: #010409; border: 1px solid #30363d; border-radius: 7px; padding: 12px 14px; overflow-x: auto; margin: 8px 0; }
+    .md-body pre code { background: none; border: none; padding: 0; color: #e6edf3; font-size: 0.82rem; }
+    .md-body blockquote { border-left: 3px solid #30363d; padding-left: 10px; color: #8b949e; margin: 6px 0; }
+    .md-body p      { margin: 4px 0; }
+    .md-body hr     { border: none; border-top: 1px solid #21262d; margin: 10px 0; }
+
+    /* ── Fixed bottom-left button bar ── */
+    #btn-bar {
+      position: fixed; bottom: 22px; left: 22px; z-index: 9999;
+      display: flex; align-items: center; gap: 9px;
+    }
+    #btn-capture {
+      display: flex; align-items: center; gap: 7px;
+      padding: 11px 16px; border-radius: 10px;
+      background: #21262d; border: 1px solid #30363d;
+      color: #e6edf3; font-size: 0.84rem; font-weight: 600;
+      cursor: pointer; transition: background .15s, border-color .15s;
+      box-shadow: 0 2px 10px rgba(0,0,0,.4);
+    }
+    #btn-capture:hover:not(:disabled) { background: #30363d; border-color: #58a6ff; }
+    #btn-capture:disabled { opacity: .38; cursor: not-allowed; }
+    #btn-capture.spinning .cap-ico  { display: none; }
+    #btn-capture.spinning .btn-spin { display: block; }
+    #btn-solve {
+      display: flex; align-items: center; gap: 7px;
+      padding: 11px 20px; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, #1a7f37, #3fb950);
+      color: #fff; font-size: 0.84rem; font-weight: 700;
+      cursor: pointer; box-shadow: 0 2px 14px rgba(63,185,80,.35);
+      transition: transform .1s, box-shadow .15s;
+    }
+    #btn-solve:hover:not(:disabled) {
+      transform: translateY(-1px); box-shadow: 0 4px 18px rgba(63,185,80,.5);
+    }
+    #btn-solve:disabled {
+      background: #21262d; color: #484f58;
+      border: 1px solid #30363d; box-shadow: none;
+      cursor: not-allowed; transform: none;
+    }
+    #btn-solve.spinning .solve-ico { display: none; }
+    #btn-solve.spinning .btn-spin  { display: block; }
+    .cap-badge {
+      background: #58a6ff; color: #0d1117;
+      border-radius: 9px; font-size: 0.67rem; font-weight: 800;
+      padding: 1px 6px; min-width: 18px; text-align: center;
+    }
+    .btn-spin {
+      width: 13px; height: 13px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: currentColor;
+      animation: spin .6s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>&#9654; RTSP Live Stream</h1>
+    <div id="status-badge" class="connecting">
+      <div id="dot"></div>
+      <span id="status-text">Connecting…</span>
+    </div>
+  </header>
+
+  <div class="stream-wrapper" id="stream-wrapper">
+    <img id="video-img" alt="live stream" src="/stream" />
+    <svg id="ocr-overlay" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="placeholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="4" width="20" height="14" rx="2"/>
+        <path d="M8 20h8M12 18v2"/>
+        <circle cx="12" cy="11" r="3"/>
+      </svg>
+      <p>Waiting for stream…</p>
+    </div>
+    <div class="overlay">
+      <span class="pill" id="res-pill">—</span>
+      <span class="pill" id="fps-pill">0 FPS</span>
+    </div>
+  </div>
+
+  <div class="info-bar">
+    <div class="info-card">
+      <div class="label">Source</div>
+      <div class="value" id="info-src" style="font-size:0.78rem;word-break:break-all;">—</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Rendered FPS</div>
+      <div class="value" id="info-fps">—</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Frames Received</div>
+      <div class="value" id="info-frames">0</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Dropped Frames</div>
+      <div class="value" id="info-dropped">0</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Latency (avg)</div>
+      <div class="value" id="info-latency">—</div>
+    </div>
+    <div class="info-card">
+      <div class="label">OCR Regions</div>
+      <div class="value" id="info-ocr-count">—</div>
+    </div>
+    <div class="info-card">
+      <div class="label">OCR Time</div>
+      <div class="value" id="info-ocr-time">—</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btn-reconnect">&#8635; Reconnect</button>
+    <button id="btn-fs">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+      </svg>
+      Fullscreen
+    </button>
+    <label class="toggle-label">
+      <input type="checkbox" id="chk-ocr-overlay" checked />
+      OCR Overlay
+    </label>
+  </div>
+
+  <div class="ocr-panel">
+    <div class="ocr-panel-header">
+      OCR Results
+      <span id="ocr-panel-meta">waiting for first scan…</span>
+    </div>
+    <div id="ocr-results-list">
+      <span class="ocr-empty">No results yet</span>
+    </div>
+  </div>
+
+  <!-- ── LM Q&A panel ──────────────────────────────────────────────── -->
+  <div class="qa-panel">
+    <div class="qa-panel-header">
+      <div>
+        <span class="qa-status-dot" id="qa-dot"></span>
+        Q&amp;A Analysis <span style="font-size:0.7rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0" id="model-label">(Ollama · granite4.1:8b)</span>
+      </div>
+      <a href="/ocr-results" target="_blank">View Full Results ↗</a>
+    </div>
+    <div id="qa-body">
+      <div class="qa-no-result">Q&amp;A will appear after Ollama processes OCR text…</div>
+    </div>
+  </div>
+
+  <!-- ── Fixed bottom-left buttons ── -->
+  <div id="btn-bar">
+    <button id="btn-capture">
+      <svg class="cap-ico" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <div class="btn-spin"></div>
+      <span id="cap-label">Capture</span>
+      <span class="cap-badge" id="cap-badge" style="display:none">0</span>
+    </button>
+
+    <button id="btn-solve">
+      <svg class="solve-ico" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      <div class="btn-spin"></div>
+      <span id="solve-label">Solve</span>
+    </button>
+  </div>
+
+  <script src="/static/marked.min.js"></script>
+  <script>
+    const img          = document.getElementById('video-img');
+    const placeholder  = document.getElementById('placeholder');
+    const badge        = document.getElementById('status-badge');
+    const statusText   = document.getElementById('status-text');
+    const fpsPill      = document.getElementById('fps-pill');
+    const resPill      = document.getElementById('res-pill');
+    const infoSrc      = document.getElementById('info-src');
+    const infoFps      = document.getElementById('info-fps');
+    const infoFrames   = document.getElementById('info-frames');
+    const infoDropped  = document.getElementById('info-dropped');
+    const infoLatency  = document.getElementById('info-latency');
+    const infoOcrCount = document.getElementById('info-ocr-count');
+    const infoOcrTime  = document.getElementById('info-ocr-time');
+    const ocrList      = document.getElementById('ocr-results-list');
+    const ocrMeta      = document.getElementById('ocr-panel-meta');
+    const svgOverlay   = document.getElementById('ocr-overlay');
+    const chkOverlay   = document.getElementById('chk-ocr-overlay');
+
+    let ws = null;
+    let reconnectTimer = null;
+    const MAX_RECONNECT_DELAY = 8000;
+    let reconnectDelay = 1000;
+    let lastOcrData  = null;
+    let lastLmData   = null;
+
+    // ── MJPEG stream setup ───────────────────────────────────────────────────
+    img.onload = () => {
+      placeholder.style.display = 'none';
+      img.style.display = 'block';
+      if (img.naturalWidth > 0) {
+        resPill.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+        svgOverlay.setAttribute('viewBox', `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
+      }
+    };
+    img.onerror = () => setStatus('offline', 'Stream error — check RTSP source');
+
+    // ── Capture / Solve buttons ───────────────────────────────────────────────
+    const btnCap    = document.getElementById('btn-capture');
+    const btnSolve  = document.getElementById('btn-solve');
+    const capLabel  = document.getElementById('cap-label');
+    const capBadge  = document.getElementById('cap-badge');
+    const solveLabel = document.getElementById('solve-label');
+
+    let capCount = 0;
+
+    function updateBadge() {
+      if (capCount > 0) {
+        capBadge.textContent = capCount;
+        capBadge.style.display = '';
+        solveLabel.textContent = `Solve (${capCount})`;
+      } else {
+        capBadge.style.display = 'none';
+        solveLabel.textContent = 'Solve';
+      }
+    }
+
+    function setBusy(on) {
+      btnCap.disabled   = on;
+      btnSolve.disabled = on;
+    }
+
+    btnCap.onclick = async () => {
+      setBusy(true);
+      btnCap.classList.add('spinning');
+      capLabel.textContent = 'Capturing…';
+      try {
+        const r = await fetch('/ocr/capture', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'busy') {
+          setBusy(false); btnCap.classList.remove('spinning'); capLabel.textContent = 'Capture';
+        }
+      } catch { setBusy(false); btnCap.classList.remove('spinning'); capLabel.textContent = 'Capture'; }
+    };
+
+    btnSolve.onclick = async () => {
+      setBusy(true);
+      btnSolve.classList.add('spinning');
+      solveLabel.textContent = 'Solving…';
+      const endpoint = capCount > 0 ? '/ocr/solve' : '/ocr/trigger';
+      try {
+        const r = await fetch(endpoint, { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'busy') {
+          setBusy(false); btnSolve.classList.remove('spinning'); updateBadge();
+        }
+      } catch { setBusy(false); btnSolve.classList.remove('spinning'); updateBadge(); }
+    };
+
+    function setStatus(state, text) {
+      badge.className = 'connecting';
+      badge.classList.add(state);
+      statusText.textContent = text;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ── OCR overlay drawing ──────────────────────────────────────────────────
+
+    function clearOCR() {
+      while (svgOverlay.firstChild) svgOverlay.removeChild(svgOverlay.firstChild);
+    }
+
+    function drawOCR(msg) {
+      clearOCR();
+      if (!chkOverlay.checked) return;
+      if (!msg.results || msg.results.length === 0) return;
+
+      const colors = ['#00ff88', '#ff6b6b', '#ffd93d', '#6bcbff', '#ff9f43'];
+
+      msg.results.forEach((item, idx) => {
+        const bbox  = item.bbox; // [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+        const color = colors[idx % colors.length];
+        const pts   = bbox.map(p => p.join(',')).join(' ');
+
+        // Bounding polygon
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        poly.setAttribute('points', pts);
+        poly.setAttribute('fill', color + '22');
+        poly.setAttribute('stroke', color);
+        poly.setAttribute('stroke-width', '3');
+        poly.setAttribute('stroke-linejoin', 'round');
+        svgOverlay.appendChild(poly);
+
+        // Background rect behind label for legibility
+        const lx = bbox[0][0];
+        const ly = bbox[0][1];
+        const label = `${item.text} ${(item.confidence * 100).toFixed(0)}%`;
+        const charW = 11;
+        const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bgRect.setAttribute('x', lx);
+        bgRect.setAttribute('y', ly - 28);
+        bgRect.setAttribute('width', label.length * charW + 8);
+        bgRect.setAttribute('height', 26);
+        bgRect.setAttribute('rx', '4');
+        bgRect.setAttribute('fill', 'rgba(0,0,0,0.75)');
+        svgOverlay.appendChild(bgRect);
+
+        // Text label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', lx + 4);
+        text.setAttribute('y', ly - 8);
+        text.setAttribute('fill', color);
+        text.setAttribute('font-size', '20');
+        text.setAttribute('font-family', 'monospace, Consolas, sans-serif');
+        text.setAttribute('font-weight', 'bold');
+        text.textContent = label;
+        svgOverlay.appendChild(text);
+      });
+    }
+
+    function updateOCRPanel(msg) {
+      infoOcrCount.textContent = `${msg.count} region${msg.count !== 1 ? 's' : ''}`;
+      infoOcrTime.textContent  = `${msg.elapsed_ms} ms`;
+
+      const ts = new Date(msg.ts * 1000);
+      const hms = ts.toLocaleTimeString();
+      ocrMeta.textContent = `${msg.count} found · ${msg.elapsed_ms} ms · ${hms}`;
+
+      ocrList.innerHTML = '';
+      if (msg.results && msg.results.length > 0) {
+        msg.results.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'ocr-item';
+          div.innerHTML = `<span class="ocr-text">${escapeHtml(item.text)}</span>`
+                        + `<span class="ocr-conf">${(item.confidence * 100).toFixed(1)}%</span>`;
+          ocrList.appendChild(div);
+        });
+      } else {
+        ocrList.innerHTML = '<span class="ocr-empty">No text detected</span>';
+      }
+    }
+
+    // ── Q&A panel ────────────────────────────────────────────────────
+
+    function updateQAPanel(data) {
+      const body = document.getElementById('qa-body');
+      const dot  = document.getElementById('qa-dot');
+      lastLmData = data;
+
+      if (!data) return;
+
+      if (data.error) {
+        dot.className  = 'qa-status-dot';
+        body.innerHTML = `<div class="lm-error-inline">⚠ ${escapeHtml(data.error)}</div>`;
+        return;
+      }
+
+      if (!data.markdown) {
+        body.innerHTML = '<div class="qa-no-result">No response received</div>';
+        return;
+      }
+
+      dot.className  = 'qa-status-dot ready';
+      body.innerHTML = `<div class="md-body">${marked.parse(data.markdown)}</div>`;
+    }
+
+    // ── WebSocket connection ─────────────────────────────────────────────────
+
+    function connect() {
+      clearTimeout(reconnectTimer);
+      if (ws) { ws.onclose = null; ws.close(); }
+
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const url   = `${proto}://${location.host}/ws`;
+      infoSrc.textContent = url;
+      setStatus('connecting', 'Connecting…');
+
+      ws = new WebSocket(url);
+      ws.binaryType = 'blob';
+
+      ws.onopen = () => {
+        setStatus('live', 'Live');
+        reconnectDelay = 1000;
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'ocr') {
+            lastOcrData = msg;
+            drawOCR(msg);
+            updateOCRPanel(msg);
+            document.getElementById('qa-dot').className = 'qa-status-dot loading';
+          } else if (msg.type === 'lm') {
+            updateQAPanel(msg.result);
+            setBusy(false);
+            btnSolve.classList.remove('spinning');
+            updateBadge();
+          } else if (msg.type === 'capture') {
+            capCount = msg.cap_num;
+            updateBadge();
+            setBusy(false);
+            btnCap.classList.remove('spinning');
+            capLabel.textContent = 'Capture';
+            updateOCRPanel({ count: msg.count, elapsed_ms: msg.elapsed_ms,
+                             ts: Date.now() / 1000, results: msg.items || [] });
+          } else if (msg.type === 'cleared') {
+            capCount = 0; updateBadge();
+          }
+        } catch (err) {
+          console.warn('Non-JSON WS message:', e.data);
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.error('WebSocket error', e);
+        setStatus('offline', 'WS Error — retrying…');
+      };
+
+      ws.onclose = () => {
+        setStatus('offline', `Reconnecting in ${reconnectDelay / 1000}s…`);
+        reconnectTimer = setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+          connect();
+        }, reconnectDelay);
+      };
+    }
+
+    // ── Controls ─────────────────────────────────────────────────────────────
+
+    document.getElementById('btn-reconnect').onclick = () => {
+      reconnectDelay = 1000;
+      img.src = '/stream?' + Date.now(); // force MJPEG reconnect
+      connect();
+    };
+
+    document.getElementById('btn-fs').onclick = () => {
+      const el = document.getElementById('stream-wrapper');
+      if (!document.fullscreenElement) el.requestFullscreen();
+      else document.exitFullscreen();
+    };
+
+    chkOverlay.onchange = () => {
+      if (chkOverlay.checked && lastOcrData) drawOCR(lastOcrData);
+      else clearOCR();
+    };
+
+    connect();
+  </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+services:
+  rtsp-streamer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rtsp-web-streamer:latest
+    container_name: rtsp_web_streamer
+    restart: unless-stopped
+
+    runtime: nvidia                 # NVIDIA Container Toolkit
+
+    environment:
+      # RTSP_URL: "rtsp://admin:imou2807@192.168.1.9:554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
+      RTSP_URL: "rtsp://192.168.1.3:8554/live/"
+      RTSP_CODEC: "h264"
+      STREAM_FPS: "5"
+      GST_DEBUG: "1"
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "all"
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"  # skip connectivity check to Chinese servers
+      OLLAMA_BASE: "http://localhost:11434"           # host reachable via network_mode: host
+      OLLAMA_MODEL: "granite4.1:8b"
+
+    volumes:
+      - ./app:/app        # live-mount: code changes take effect on restart, no rebuild needed
+
+    network_mode: host
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7894/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

@@ -1,0 +1,1 @@
+docker build . -t rtsp_web_streamer
